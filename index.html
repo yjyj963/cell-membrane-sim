@@ -6,47 +6,65 @@
   <title>세포막 물질 이동 시뮬레이션</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background-color: #f4f6f8; color: #333; display: flex; flex-direction: column; align-items: center; padding: 20px; }
-    h1 { margin-bottom: 15px; font-size: 1.5rem; }
-    .container { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; max-width: 1000px; width: 100%; }
-    canvas { background-color: #ffffff; border: 2px solid #cbd5e1; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-    .control-panel { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); width: 320px; display: flex; flex-direction: column; gap: 15px; }
+    body { background-color: #f1f5f9; color: #1e293b; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+    h1 { margin-bottom: 15px; font-size: 1.4rem; font-weight: 700; }
+    .container { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; max-width: 1040px; width: 100%; }
+    canvas { background-color: #ffffff; border: 2px solid #cbd5e1; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+    .control-panel { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); width: 340px; display: flex; flex-direction: column; gap: 14px; }
     .control-group { display: flex; flex-direction: column; gap: 6px; }
     label { font-weight: 600; font-size: 0.85rem; color: #475569; }
-    select, button { padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.9rem; cursor: pointer; }
-    button { background-color: #2563eb; color: white; border: none; font-weight: 600; transition: background 0.2s; }
+    select, button, input[type="range"] { padding: 8px 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.9rem; }
+    button { background-color: #2563eb; color: white; border: none; font-weight: 600; cursor: pointer; transition: background 0.2s; }
     button:hover { background-color: #1d4ed8; }
-    .stats { font-size: 0.85rem; line-height: 1.5; background-color: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0; }
-    .badge { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; }
+    .legend { display: flex; flex-direction: column; gap: 6px; font-size: 0.8rem; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0; }
+    .legend-item { display: flex; align-items: center; gap: 8px; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+    .desc-box { font-size: 0.82rem; line-height: 1.45; color: #334155; background: #eff6ff; padding: 10px; border-radius: 6px; border-left: 4px solid #3b82f6; }
+    .stats-table { width: 100%; font-size: 0.8rem; border-collapse: collapse; margin-top: 4px; }
+    .stats-table td { padding: 4px; border-bottom: 1px solid #e2e8f0; }
   </style>
 </head>
 <body>
-  <h1>세포막을 통한 물질 출입 시뮬레이터</h1>
+  <h1>세포막 물질 출입 및 선택적 투과성 시뮬레이터</h1>
   <div class="container">
-    <canvas id="simCanvas" width="600" height="450"></canvas>
+    <canvas id="simCanvas" width="620" height="480"></canvas>
     
     <div class="control-panel">
       <div class="control-group">
         <label for="modeSelect">수송 방식 선택</label>
         <select id="modeSelect">
-          <option value="simple">단순 확산 (산소/이산화탄소)</option>
-          <option value="facilitated">촉진 확산 (포도당/이온 통로)</option>
-          <option value="active">능동 수송 (이온 펌프, ATP 소모)</option>
-          <option value="osmosis">삼투 현상 (물 분자)</option>
+          <option value="simple">1. 단순 확산 (지용성/기체 vs 이온)</option>
+          <option value="facilitated">2. 촉진 확산 (포도당 vs 특이성 없는 당류)</option>
+          <option value="active">3. 능동 수송 (ATP 소모 역방향 펌프)</option>
+          <option value="osmosis">4. 삼투 현상 (아쿠아포린 물 이동)</option>
         </select>
       </div>
 
       <div class="control-group">
-        <button id="resetBtn">시뮬레이션 리셋</button>
+        <label for="speedRange">시뮬레이션 속도: <span id="speedVal">2.5x</span></label>
+        <input type="range" id="speedRange" min="1" max="5" step="0.5" value="2.5">
       </div>
 
-      <div class="stats">
-        <strong>물질 현황</strong><br>
-        세포 밖 (상단): <span id="outsideCount">0</span>개<br>
-        세포 안 (하단): <span id="insideCount">0</span>개<br>
-        <hr style="margin: 8px 0; border: none; border-top: 1px dashed #cbd5e1;">
-        <div id="modeDesc" style="color: #64748b;"></div>
+      <div class="control-group">
+        <button id="resetBtn">시뮬레이션 초기화 (Reset)</button>
       </div>
+
+      <div class="legend" id="legendBox">
+        <!-- 자바스크립트로 범례 동적 생성 -->
+      </div>
+
+      <div class="desc-box" id="modeDesc"></div>
+
+      <table class="stats-table">
+        <thead>
+          <tr style="text-align: left; font-weight: 600; color: #64748b;">
+            <td>구분</td>
+            <td>세포 밖 (상단)</td>
+            <td>세포 안 (하단)</td>
+          </tr>
+        </thead>
+        <tbody id="statsBody"></tbody>
+      </table>
     </div>
   </div>
 
