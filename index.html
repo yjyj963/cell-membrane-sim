@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>세포막 물질 이동 시뮬레이션</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: #f4f6f8; color: #333; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+    h1 { margin-bottom: 15px; font-size: 1.5rem; }
+    .container { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; max-width: 1000px; width: 100%; }
+    canvas { background-color: #ffffff; border: 2px solid #cbd5e1; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .control-panel { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); width: 320px; display: flex; flex-direction: column; gap: 15px; }
+    .control-group { display: flex; flex-direction: column; gap: 6px; }
+    label { font-weight: 600; font-size: 0.85rem; color: #475569; }
+    select, button { padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.9rem; cursor: pointer; }
+    button { background-color: #2563eb; color: white; border: none; font-weight: 600; transition: background 0.2s; }
+    button:hover { background-color: #1d4ed8; }
+    .stats { font-size: 0.85rem; line-height: 1.5; background-color: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0; }
+    .badge { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; }
+  </style>
+</head>
+<body>
+  <h1>세포막을 통한 물질 출입 시뮬레이터</h1>
+  <div class="container">
+    <canvas id="simCanvas" width="600" height="450"></canvas>
+    
+    <div class="control-panel">
+      <div class="control-group">
+        <label for="modeSelect">수송 방식 선택</label>
+        <select id="modeSelect">
+          <option value="simple">단순 확산 (산소/이산화탄소)</option>
+          <option value="facilitated">촉진 확산 (포도당/이온 통로)</option>
+          <option value="active">능동 수송 (이온 펌프, ATP 소모)</option>
+          <option value="osmosis">삼투 현상 (물 분자)</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <button id="resetBtn">시뮬레이션 리셋</button>
+      </div>
+
+      <div class="stats">
+        <strong>물질 현황</strong><br>
+        세포 밖 (상단): <span id="outsideCount">0</span>개<br>
+        세포 안 (하단): <span id="insideCount">0</span>개<br>
+        <hr style="margin: 8px 0; border: none; border-top: 1px dashed #cbd5e1;">
+        <div id="modeDesc" style="color: #64748b;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="simulation.js"></script>
+</body>
+</html>
