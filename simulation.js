@@ -9,184 +9,397 @@ const modeDescEl = document.getElementById('modeDesc');
 const legendBox = document.getElementById('legendBox');
 
 const MEMBRANE_Y = canvas.height / 2;
-const MEMBRANE_THICKNESS = 46;
+const MEMBRANE_THICKNESS = 62;
+const HEAD_RADIUS = 6.5;
 
 let particles = [];
-let channels = [];
+let proteins = [];
 
 const MODE_CONFIG = {
-  simple: {
-    desc: "<b>단순 확산:</b> 산소($O_2$)가 인지질 2중층을 통과하여 고농도에서 저농도로 이동합니다. <b>동적 평형(세포 안팎의 농도가 같아짐)</b>에 도달하면 순이동량이 0이 되어 농도가 일정하게 유지됩니다.",
+  all: {
+    desc: "<b>교과서 종합 모드:</b><br>• <b>작은 분자(산소)/소수성:</b> 인지질 2중층을 직접 쉽게 통과<br>• <b>포도당:</b> 운반체 단백질을 통해서만 통과 (과당은 통과 불가)<br>• <b>이온:</b> 전하 때문에 인지질은 통과 못하며, 통로단백질을 통해 이동",
     legend: [
-      { color: '#10b981', label: '산소/비극성 분자 (막 통과 가능)' },
-      { color: '#ef4444', label: '극성/대형 분자 (막 통과 불가)' }
+      { type: 'circle', color: '#ef4444', label: '산소/소수성 분자 (직접 통과)' },
+      { type: 'hex', color: '#db2777', label: '포도당 (운반체단백질 통과)' },
+      { type: 'hex', color: '#f97316', label: '과당 (특이성 결여, 통과 불가)' },
+      { type: 'circle', color: '#84cc16', label: '이온(Na+/K+) (통로단백질 통과)' }
     ]
   },
-  facilitated: {
-    desc: "<b>촉진 확산:</b> 포도당은 GLUT 통로를 통해 빠르게 이동하여 <b>동적 평형(50:50)</b>을 형성한 뒤 안정적으로 유지됩니다. 과당은 특이성이 맞지 않아 전혀 통과하지 못합니다.",
+  simple: {
+    desc: "<b>단순 확산:</b> 기체 및 작은 비극성 분자는 친수성 머리와 소수성 꼬리로 이루어진 인지질 2중층을 직접 투과하여 농도가 높은 곳에서 낮은 곳으로 이동합니다.",
     legend: [
-      { color: '#2563eb', label: '포도당 (GLUT 결합 및 통과)' },
-      { color: '#ea580c', label: '과당 (특이성 결여, 통과 불가)' }
+      { type: 'circle', color: '#ef4444', label: '산소 분자 (직접 투과)' },
+      { type: 'circle', color: '#84cc16', label: '이온 (소수성 코어 통과 불가)' }
+    ]
+  },
+  carrier: {
+    desc: "<b>운반체 단백질 촉진 확산:</b> 운반체 단백질은 특정 입체 구조를 가진 포도당과만 결합하여 통과시킵니다. 구조가 다른 과당은 결합하지 못하고 튕겨 나옵니다.",
+    legend: [
+      { type: 'hex', color: '#db2777', label: '포도당 (운반체 결합 후 통과)' },
+      { type: 'hex', color: '#f97316', label: '과당 (특이성 결여, 반사)' }
+    ]
+  },
+  channel: {
+    desc: "<b>통로 단백질 촉진 확산:</b> 친수성 구멍이 형성되어 있어 전하를 띤 이온들이 인지질의 방해를 받지 않고 농도 기울기에 따라 신속하게 통과합니다.",
+    legend: [
+      { type: 'circle', color: '#84cc16', label: '이온 (통로단백질 신속 통과)' },
+      { type: 'circle', color: '#64748b', label: '불투과성 대형 입자' }
     ]
   },
   active: {
-    desc: "<b>능동 수송:</b> ATP 펌프가 농도 기울기를 거슬러 세포 안의 이온을 밖으로 강제 수송합니다. 세포 밖 고농도, 세포 안 저농도 상태가 완성되면 안정화됩니다.",
+    desc: "<b>능동 수송:</b> ATP 에너지를 이용하여 세포 내 저농도 이온을 세포 밖 고농도 환경으로 강제 펌핑합니다.",
     legend: [
-      { color: '#9333ea', label: '수송 이온 (역방향 수송)' },
-      { color: '#f59e0b', label: 'ATP 펌프 단백질' }
-    ]
-  },
-  osmosis: {
-    desc: "<b>삼투 현상:</b> 용질은 통과하지 못하며, 물 분자가 고농도 용질 구역(세포 안)으로 빠르게 유입되어 수분 퍼텐셜 평형에 도달하면 안정화됩니다.",
-    legend: [
-      { color: '#0284c7', label: '물 분자 (아쿠아포린 통과)' },
-      { color: '#b91c1c', label: '막 불투과성 대형 용질' }
+      { type: 'circle', color: '#84cc16', label: '수송 이온 (농도 기울기 역행)' },
+      { type: 'rect', color: '#f97316', label: 'ATP 펌프 단백질' }
     ]
   }
 };
 
+// 교과서 스타일 단백질 정의
+function setupProteins(mode) {
+  proteins = [];
+  if (mode === 'all') {
+    proteins.push({ type: 'carrier', x: 440, width: 68, name: '운반체단백질' });
+    proteins.push({ type: 'channel', x: 670, width: 64, name: '통로단백질' });
+  } else if (mode === 'carrier') {
+    proteins.push({ type: 'carrier', x: 340, width: 70, name: '운반체단백질 1' });
+    proteins.push({ type: 'carrier', x: 550, width: 70, name: '운반체단백질 2' });
+  } else if (mode === 'channel') {
+    proteins.push({ type: 'channel', x: 340, width: 66, name: '통로단백질 1' });
+    proteins.push({ type: 'channel', x: 560, width: 66, name: '통로단백질 2' });
+  } else if (mode === 'active') {
+    proteins.push({ type: 'pump', x: 380, width: 72, name: 'ATP 펌프' });
+    proteins.push({ type: 'pump', x: 600, width: 72, name: 'ATP 펌프' });
+  }
+}
+
 class Particle {
-  constructor(x, y, type) {
+  constructor(x, y, kind) {
     this.x = x;
     this.y = y;
-    this.type = type;
+    this.kind = kind; // 'oxygen', 'glucose', 'fructose', 'ion', 'blocked'
     
-    const speed = 3.2;
-    this.vx = (Math.random() - 0.5) * speed;
-    this.vy = (Math.random() - 0.5) * speed;
+    const baseSpeed = 3.2;
+    this.vx = (Math.random() - 0.5) * baseSpeed;
+    this.vy = (Math.random() - 0.5) * baseSpeed;
 
-    if (this.type === 'water') this.radius = 4;
-    else if (this.type === 'impermeable' || this.type === 'fructose' || this.type === 'solute_large') this.radius = 8;
-    else this.radius = 6;
+    if (this.kind === 'oxygen') this.radius = 5.5;
+    else if (this.kind === 'ion') this.radius = 6;
+    else this.radius = 8; // 포도당, 과당
   }
 
-  update(mode, netDirection) {
+  update(mode, netDir) {
     const topMembrane = MEMBRANE_Y - MEMBRANE_THICKNESS / 2;
     const bottomMembrane = MEMBRANE_Y + MEMBRANE_THICKNESS / 2;
 
-    // --- 통로 유도(Attraction) 로직 (평형 전까지만 한 방향으로 강하게 유도) ---
-    if (mode === 'facilitated' && this.type === 'glucose') {
-      let nearestChannel = channels.reduce((prev, curr) => 
-        Math.abs(curr.x - this.x) < Math.abs(prev.x - this.x) ? curr : prev, channels[0]);
-      
-      // 위쪽이 많을 때는 아래로, 아래쪽이 많을 때는 위로 유인
-      if (netDirection > 0 && this.y < topMembrane && this.y > topMembrane - 80) {
-        this.vx += (nearestChannel.x - this.x) * 0.05;
+    // --- 수송체 유도(Attraction) 로직 ---
+    if (this.kind === 'glucose') {
+      let carrier = proteins.find(p => p.type === 'carrier');
+      if (carrier && this.y < topMembrane && this.y > topMembrane - 90 && netDir >= 0) {
+        this.vx += (carrier.x - this.x) * 0.05;
         this.vy = Math.abs(this.vy) + 0.4;
-      } else if (netDirection < 0 && this.y > bottomMembrane && this.y < bottomMembrane + 80) {
-        this.vx += (nearestChannel.x - this.x) * 0.05;
-        this.vy = -Math.abs(this.vy) - 0.4;
       }
-    } 
-    else if (mode === 'active' && this.type === 'active_ion') {
-      let nearestChannel = channels.reduce((prev, curr) => 
-        Math.abs(curr.x - this.x) < Math.abs(prev.x - this.x) ? curr : prev, channels[0]);
-      if (this.y > bottomMembrane && this.y < bottomMembrane + 90) {
-        this.vx += (nearestChannel.x - this.x) * 0.06;
+    } else if (this.kind === 'ion' && mode !== 'active') {
+      let ch = proteins.find(p => p.type === 'channel');
+      if (ch && this.y < topMembrane && this.y > topMembrane - 80 && netDir >= 0) {
+        this.vx += (ch.x - this.x) * 0.05;
+        this.vy = Math.abs(this.vy) + 0.4;
+      }
+    } else if (this.kind === 'ion' && mode === 'active') {
+      let pump = proteins.find(p => p.type === 'pump');
+      if (pump && this.y > bottomMembrane && this.y < bottomMembrane + 90) {
+        this.vx += (pump.x - this.x) * 0.06;
         this.vy = -Math.abs(this.vy) - 0.6;
       }
     }
-    else if (mode === 'osmosis' && this.type === 'water') {
-      if (netDirection > 0 && this.y < topMembrane && this.y > topMembrane - 70) {
-        this.vy = Math.abs(this.vy) + 0.4;
-      }
-    }
 
-    // 위치 갱신
     this.x += this.vx;
     this.y += this.vy;
 
-    // 속도 유지
-    this.vx *= 0.98;
-    this.vy *= 0.98;
+    // 감속 보정 및 최저 속도 유지
+    this.vx *= 0.985;
+    this.vy *= 0.985;
     if (Math.abs(this.vx) < 0.8) this.vx = (Math.random() - 0.5) * 3;
     if (Math.abs(this.vy) < 0.8) this.vy = (Math.random() - 0.5) * 3;
 
-    // 외곽 벽 충돌
+    // 벽면 충돌
     if (this.x - this.radius < 0) { this.x = this.radius; this.vx = Math.abs(this.vx); }
     if (this.x + this.radius > canvas.width) { this.x = canvas.width - this.radius; this.vx = -Math.abs(this.vx); }
     if (this.y - this.radius < 0) { this.y = this.radius; this.vy = Math.abs(this.vy); }
     if (this.y + this.radius > canvas.height) { this.y = canvas.height - this.radius; this.vy = -Math.abs(this.vy); }
 
-    // --- 세포막 충돌 및 통과 판별 ---
+    // 막 접촉 판별
     if (this.y + this.radius > topMembrane && this.y - this.radius < bottomMembrane) {
-      
-      // 1. 단순 확산
-      if (mode === 'simple') {
-        if (this.type === 'permeable') {
-          // 평형 상태 도달 시 양방향 균등 통과, 평형 전에는 고농도->저농도 우선 통과
-          if (netDirection > 0 && this.y < MEMBRANE_Y) this.vy = 3.2;
-          else if (netDirection < 0 && this.y > MEMBRANE_Y) this.vy = -3.2;
-          // 평형(netDirection === 0) 시 관성대로 자연스럽게 통과
-        } else {
-          this.bounce(topMembrane, bottomMembrane);
+      let canPass = false;
+
+      // 1. 산소 (인지질 층 직접 투과)
+      if (this.kind === 'oxygen') {
+        canPass = true;
+        if (netDir > 0 && this.y < MEMBRANE_Y) this.vy = 3.5;
+        else if (netDir < 0 && this.y > MEMBRANE_Y) this.vy = -3.5;
+      }
+
+      // 2. 포도당 (운반체 단백질 위치만 투과)
+      else if (this.kind === 'glucose') {
+        let insideCarrier = proteins.some(p => p.type === 'carrier' && Math.abs(this.x - p.x) < p.width / 2.3);
+        if (insideCarrier) {
+          canPass = true;
+          if (netDir >= 0 && this.y < MEMBRANE_Y) this.vy = 4.2;
         }
       }
 
-      // 2. 촉진 확산
-      else if (mode === 'facilitated') {
-        let inChannel = channels.some(ch => Math.abs(this.x - ch.x) < ch.width / 2);
-        if (inChannel && this.type === 'glucose') {
-          if (netDirection > 0 && this.y < MEMBRANE_Y) this.vy = 4.0;
-          else if (netDirection < 0 && this.y > MEMBRANE_Y) this.vy = -4.0;
-        } else {
-          this.bounce(topMembrane, bottomMembrane);
+      // 3. 이온 (통로 단백질 또는 펌프 투과)
+      else if (this.kind === 'ion') {
+        let insideChannel = proteins.some(p => p.type === 'channel' && Math.abs(this.x - p.x) < p.width / 2.5);
+        let insidePump = proteins.some(p => p.type === 'pump' && Math.abs(this.x - p.x) < p.width / 2.5);
+        
+        if (insideChannel) {
+          canPass = true;
+          if (netDir >= 0 && this.y < MEMBRANE_Y) this.vy = 4.5;
+        } else if (insidePump) {
+          canPass = true;
+          this.vy = -6.0; // 밖으로 배출
         }
       }
 
-      // 3. 능동 수송
-      else if (mode === 'active') {
-        let inChannel = channels.some(ch => Math.abs(this.x - ch.x) < ch.width / 2);
-        if (inChannel && this.type === 'active_ion' && this.y > MEMBRANE_Y) {
-          this.vy = -5.5; // 아래에서 위로 강제 배출
+      // 통과 불가 시 반사 (과당, 인지질에 부딪힌 이온 등)
+      if (!canPass) {
+        if (this.y < MEMBRANE_Y) {
+          this.y = topMembrane - this.radius;
+          this.vy = -Math.abs(this.vy);
         } else {
-          this.bounce(topMembrane, bottomMembrane);
+          this.y = bottomMembrane + this.radius;
+          this.vy = Math.abs(this.vy);
         }
       }
-
-      // 4. 삼투 현상
-      else if (mode === 'osmosis') {
-        let inChannel = channels.some(ch => Math.abs(this.x - ch.x) < ch.width / 2);
-        if (this.type === 'water') {
-          if (netDirection > 0 && this.y < MEMBRANE_Y) this.vy = 3.5;
-        } else {
-          this.bounce(topMembrane, bottomMembrane);
-        }
-      }
-    }
-  }
-
-  bounce(top, bottom) {
-    if (this.y < MEMBRANE_Y) {
-      this.y = top - this.radius;
-      this.vy = -Math.abs(this.vy);
-    } else {
-      this.y = bottom + this.radius;
-      this.vy = Math.abs(this.vy);
     }
   }
 
   draw() {
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-
-    switch (this.type) {
-      case 'permeable': ctx.fillStyle = '#10b981'; break;
-      case 'impermeable': ctx.fillStyle = '#ef4444'; break;
-      case 'glucose': ctx.fillStyle = '#2563eb'; break;
-      case 'fructose': ctx.fillStyle = '#ea580c'; break;
-      case 'active_ion': ctx.fillStyle = '#9333ea'; break;
-      case 'water': ctx.fillStyle = '#0284c7'; break;
-      case 'solute_large': ctx.fillStyle = '#b91c1c'; break;
-      default: ctx.fillStyle = '#64748b';
+    ctx.save();
+    if (this.kind === 'glucose' || this.kind === 'fructose') {
+      // 6각형 (포도당: 핑크), 5각형 (과당: 주황)
+      ctx.fillStyle = this.kind === 'glucose' ? '#db2777' : '#ea580c';
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      drawPolygon(ctx, this.x, this.y, this.radius, this.kind === 'glucose' ? 6 : 5);
+    } else {
+      // 원형 분자 (산소: 적색, 이온: 연두)
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+      ctx.fillStyle = this.kind === 'oxygen' ? '#ef4444' : (this.kind === 'ion' ? '#84cc16' : '#64748b');
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.closePath();
     }
-
-    ctx.fill();
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.closePath();
+    ctx.restore();
   }
+}
+
+function drawPolygon(c, x, y, radius, sides) {
+  c.beginPath();
+  for (let i = 0; i < sides; i++) {
+    const a = (i * 2 * Math.PI) / sides;
+    const px = x + radius * Math.cos(a);
+    const py = y + radius * Math.sin(a);
+    if (i === 0) c.moveTo(px, py);
+    else c.lineTo(px, py);
+  }
+  c.closePath();
+  c.fill();
+  c.stroke();
+}
+
+// 교과서풍 인지질 2중층(Phospholipid Bilayer) 그리기
+function drawPhospholipidBilayer() {
+  const topY = MEMBRANE_Y - MEMBRANE_THICKNESS / 2;
+  const botY = MEMBRANE_Y + MEMBRANE_THICKNESS / 2;
+  const step = 14;
+
+  for (let x = 8; x < canvas.width; x += step) {
+    // 단백질이 배치된 곳은 인지질을 그리지 않음
+    let inProtein = proteins.some(p => Math.abs(x - p.x) < p.width / 1.8);
+    if (inProtein) continue;
+
+    // 1. 소수성 꼬리 (Hydrophobic tails) - 2가닥 구불구불한 선
+    ctx.strokeStyle = '#c29d62';
+    ctx.lineWidth = 1.6;
+
+    // 상층 꼬리 (아래로 뻗음)
+    ctx.beginPath();
+    ctx.moveTo(x - 2, topY + HEAD_RADIUS);
+    ctx.quadraticCurveTo(x - 5, topY + 16, x - 2, topY + 25);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x + 2, topY + HEAD_RADIUS);
+    ctx.quadraticCurveTo(x + 5, topY + 16, x + 2, topY + 25);
+    ctx.stroke();
+
+    // 하층 꼬리 (위로 뻗음)
+    ctx.beginPath();
+    ctx.moveTo(x - 2, botY - HEAD_RADIUS);
+    ctx.quadraticCurveTo(x - 5, botY - 16, x - 2, botY - 25);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x + 2, botY - HEAD_RADIUS);
+    ctx.quadraticCurveTo(x + 5, botY - 16, x + 2, botY - 25);
+    ctx.stroke();
+
+    // 2. 친수성 머리 (Hydrophilic heads) - 둥근 주황/황갈색 볼
+    drawHead(x, topY);
+    drawHead(x, botY);
+  }
+}
+
+function drawHead(x, y) {
+  let grad = ctx.createRadialGradient(x - 2, y - 2, 1, x, y, HEAD_RADIUS);
+  grad.addColorStop(0, '#fbd38d');
+  grad.addColorStop(1, '#b7791f');
+
+  ctx.beginPath();
+  ctx.arc(x, y, HEAD_RADIUS, 0, Math.PI * 2);
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.strokeStyle = '#975a16';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.closePath();
+}
+
+// 교과서풍 막 단백질(운반체 & 통로) 그리기
+function drawProteins() {
+  const topY = MEMBRANE_Y - MEMBRANE_THICKNESS / 2 - 6;
+  const h = MEMBRANE_THICKNESS + 12;
+
+  proteins.forEach(p => {
+    ctx.save();
+    if (p.type === 'carrier') {
+      // 1. 운반체 단백질 (주황빛 조개/튤립 모양)
+      let grad = ctx.createLinearGradient(p.x - p.width / 2, topY, p.x + p.width / 2, topY + h);
+      grad.addColorStop(0, '#f97316');
+      grad.addColorStop(0.5, '#fdba74');
+      grad.addColorStop(1, '#ea580c');
+
+      ctx.fillStyle = grad;
+      ctx.strokeStyle = '#c2410c';
+      ctx.lineWidth = 2;
+
+      // 좌측 엽
+      ctx.beginPath();
+      ctx.ellipse(p.x - p.width / 4, MEMBRANE_Y, p.width / 3.8, h / 1.9, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // 우측 엽
+      ctx.beginPath();
+      ctx.ellipse(p.x + p.width / 4, MEMBRANE_Y, p.width / 3.8, h / 1.9, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // 결합 포켓
+      ctx.fillStyle = '#ffedd5';
+      ctx.beginPath();
+      ctx.arc(p.x, MEMBRANE_Y, 8, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 라벨
+      ctx.fillStyle = '#7c2d12';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(p.name, p.x, MEMBRANE_Y + h / 2 + 18);
+    } 
+    else if (p.type === 'channel') {
+      // 2. 통로 단백질 (푸른빛 원통형 채널)
+      let grad = ctx.createLinearGradient(p.x - p.width / 2, topY, p.x + p.width / 2, topY + h);
+      grad.addColorStop(0, '#38bdf8');
+      grad.addColorStop(0.5, '#bae6fd');
+      grad.addColorStop(1, '#0284c7');
+
+      ctx.fillStyle = grad;
+      ctx.strokeStyle = '#0369a1';
+      ctx.lineWidth = 2;
+
+      // 좌측 배럴
+      ctx.beginPath();
+      ctx.roundRect(p.x - p.width / 2, topY, p.width / 2.3, h, 8);
+      ctx.fill();
+      ctx.stroke();
+
+      // 우측 배럴
+      ctx.beginPath();
+      ctx.roundRect(p.x + p.width / 2 - p.width / 2.3, topY, p.width / 2.3, h, 8);
+      ctx.fill();
+      ctx.stroke();
+
+      // 중앙 친수성 채널 공간 (블루 하이라이트)
+      ctx.fillStyle = '#e0f2fe';
+      ctx.fillRect(p.x - 5, topY + 4, 10, h - 8);
+
+      ctx.fillStyle = '#075985';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(p.name, p.x, MEMBRANE_Y + h / 2 + 18);
+    }
+    else if (p.type === 'pump') {
+      // 3. ATP 펌프 단백질
+      ctx.fillStyle = '#eab308';
+      ctx.strokeStyle = '#a16207';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(p.x - p.width / 2, topY, p.width, h, 10);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#713f12';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(p.name, p.x, MEMBRANE_Y);
+      ctx.fillText('ATP', p.x, MEMBRANE_Y + h / 2 + 16);
+    }
+    ctx.restore();
+  });
+}
+
+function drawBackgroundAndLabels() {
+  // 세포 밖 (연파랑)
+  ctx.fillStyle = '#dbeafe';
+  ctx.fillRect(0, 0, canvas.width, MEMBRANE_Y);
+
+  // 세포 안 (연크림 노랑)
+  ctx.fillStyle = '#fef3c7';
+  ctx.fillRect(0, MEMBRANE_Y, canvas.width, canvas.height - MEMBRANE_Y);
+
+  // 텍스트 라벨
+  ctx.fillStyle = '#1e3a8a';
+  ctx.font = 'bold 15px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('세포 밖 (Outside)', 20, 32);
+
+  ctx.fillStyle = '#78350f';
+  ctx.fillText('세포 안 (Inside)', 20, canvas.height - 20);
+
+  // 우측 "인지질 이중층" 브래킷 표시 (교과서 스타일)
+  const topY = MEMBRANE_Y - MEMBRANE_THICKNESS / 2;
+  const botY = MEMBRANE_Y + MEMBRANE_THICKNESS / 2;
+  const bx = canvas.width - 25;
+
+  ctx.strokeStyle = '#92400e';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(bx - 6, topY);
+  ctx.lineTo(bx, topY);
+  ctx.lineTo(bx, botY);
+  ctx.lineTo(bx - 6, botY);
+  ctx.stroke();
+
+  ctx.fillStyle = '#92400e';
+  ctx.font = '12px sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText('인지질 이중층', bx - 10, MEMBRANE_Y + 4);
 }
 
 function updateLegendAndDesc(mode) {
@@ -196,7 +409,11 @@ function updateLegendAndDesc(mode) {
   conf.legend.forEach(item => {
     const div = document.createElement('div');
     div.className = 'legend-item';
-    div.innerHTML = `<span class="legend-dot" style="background-color: ${item.color};"></span><span>${item.label}</span>`;
+    let icon = `<span class="legend-icon legend-circle" style="background-color: ${item.color};"></span>`;
+    if (item.type === 'hex') {
+      icon = `<span class="legend-icon legend-hex" style="background-color: ${item.color};"></span>`;
+    }
+    div.innerHTML = `${icon}<span>${item.label}</span>`;
     legendBox.appendChild(div);
   });
 }
@@ -204,107 +421,56 @@ function updateLegendAndDesc(mode) {
 function initSimulation() {
   const mode = modeSelect.value;
   particles = [];
-  channels = [];
+  setupProteins(mode);
   updateLegendAndDesc(mode);
 
   const topZone = MEMBRANE_Y - MEMBRANE_THICKNESS / 2 - 25;
-  const bottomZoneStart = MEMBRANE_Y + MEMBRANE_THICKNESS / 2 + 25;
-  const bottomZoneHeight = canvas.height - bottomZoneStart - 10;
+  const botStart = MEMBRANE_Y + MEMBRANE_THICKNESS / 2 + 25;
+  const botH = canvas.height - botStart - 15;
 
-  if (mode === 'simple') {
-    // 산소 32개(밖) : 4개(안) -> 평형 시 약 18:18
-    for (let i = 0; i < 32; i++) particles.push(new Particle(Math.random() * (canvas.width - 30) + 15, Math.random() * topZone + 10, 'permeable'));
-    for (let i = 0; i < 20; i++) particles.push(new Particle(Math.random() * (canvas.width - 30) + 15, Math.random() * topZone + 10, 'impermeable'));
-    for (let i = 0; i < 4; i++) particles.push(new Particle(Math.random() * (canvas.width - 30) + 15, Math.random() * bottomZoneHeight + bottomZoneStart, 'permeable'));
+  if (mode === 'all') {
+    // 산소 16개 (직접 통과)
+    for (let i = 0; i < 16; i++) particles.push(new Particle(Math.random() * 260 + 20, Math.random() * topZone + 15, 'oxygen'));
+    // 포도당 14개 + 과당 10개 (운반체 구역)
+    for (let i = 0; i < 14; i++) particles.push(new Particle(Math.random() * 180 + 340, Math.random() * topZone + 15, 'glucose'));
+    for (let i = 0; i < 10; i++) particles.push(new Particle(Math.random() * 180 + 340, Math.random() * topZone + 15, 'fructose'));
+    // 이온 16개 (통로 구역)
+    for (let i = 0; i < 16; i++) particles.push(new Particle(Math.random() * 180 + 580, Math.random() * topZone + 15, 'ion'));
   } 
-  else if (mode === 'facilitated') {
-    channels.push({ x: canvas.width * 0.22, width: 44, name: 'GLUT' });
-    channels.push({ x: canvas.width * 0.50, width: 44, name: 'GLUT' });
-    channels.push({ x: canvas.width * 0.78, width: 44, name: 'GLUT' });
-
-    // 포도당 28개(밖) : 2개(안) -> 평형 시 약 15:15
-    for (let i = 0; i < 28; i++) particles.push(new Particle(Math.random() * (canvas.width - 30) + 15, Math.random() * topZone + 10, 'glucose'));
-    for (let i = 0; i < 20; i++) particles.push(new Particle(Math.random() * (canvas.width - 30) + 15, Math.random() * topZone + 10, 'fructose'));
-    for (let i = 0; i < 2; i++) particles.push(new Particle(Math.random() * (canvas.width - 30) + 15, Math.random() * bottomZoneHeight + bottomZoneStart, 'glucose'));
+  else if (mode === 'simple') {
+    for (let i = 0; i < 28; i++) particles.push(new Particle(Math.random() * (canvas.width - 40) + 20, Math.random() * topZone + 15, 'oxygen'));
+    for (let i = 0; i < 18; i++) particles.push(new Particle(Math.random() * (canvas.width - 40) + 20, Math.random() * topZone + 15, 'ion'));
+    for (let i = 0; i < 4; i++) particles.push(new Particle(Math.random() * (canvas.width - 40) + 20, Math.random() * botH + botStart, 'oxygen'));
+  } 
+  else if (mode === 'carrier') {
+    for (let i = 0; i < 24; i++) particles.push(new Particle(Math.random() * (canvas.width - 40) + 20, Math.random() * topZone + 15, 'glucose'));
+    for (let i = 0; i < 18; i++) particles.push(new Particle(Math.random() * (canvas.width - 40) + 20, Math.random() * topZone + 15, 'fructose'));
+    for (let i = 0; i < 3; i++) particles.push(new Particle(Math.random() * (canvas.width - 40) + 20, Math.random() * botH + botStart, 'glucose'));
+  } 
+  else if (mode === 'channel') {
+    for (let i = 0; i < 30; i++) particles.push(new Particle(Math.random() * (canvas.width - 40) + 20, Math.random() * topZone + 15, 'ion'));
+    for (let i = 0; i < 4; i++) particles.push(new Particle(Math.random() * (canvas.width - 40) + 20, Math.random() * botH + botStart, 'ion'));
   } 
   else if (mode === 'active') {
-    channels.push({ x: canvas.width * 0.30, width: 48, name: 'ATP 펌프' });
-    channels.push({ x: canvas.width * 0.70, width: 48, name: 'ATP 펌프' });
-
-    for (let i = 0; i < 35; i++) particles.push(new Particle(Math.random() * (canvas.width - 30) + 15, Math.random() * topZone + 10, 'active_ion'));
-    for (let i = 0; i < 15; i++) particles.push(new Particle(Math.random() * (canvas.width - 30) + 15, Math.random() * bottomZoneHeight + bottomZoneStart, 'active_ion'));
-  } 
-  else if (mode === 'osmosis') {
-    channels.push({ x: canvas.width * 0.25, width: 32, name: 'AQP' });
-    channels.push({ x: canvas.width * 0.50, width: 32, name: 'AQP' });
-    channels.push({ x: canvas.width * 0.75, width: 32, name: 'AQP' });
-
-    for (let i = 0; i < 40; i++) particles.push(new Particle(Math.random() * (canvas.width - 30) + 15, Math.random() * topZone + 10, 'water'));
-    for (let i = 0; i < 10; i++) particles.push(new Particle(Math.random() * (canvas.width - 30) + 15, Math.random() * bottomZoneHeight + bottomZoneStart, 'water'));
-    for (let i = 0; i < 20; i++) particles.push(new Particle(Math.random() * (canvas.width - 30) + 15, Math.random() * bottomZoneHeight + bottomZoneStart, 'solute_large'));
+    for (let i = 0; i < 32; i++) particles.push(new Particle(Math.random() * (canvas.width - 40) + 20, Math.random() * topZone + 15, 'ion'));
+    for (let i = 0; i < 14; i++) particles.push(new Particle(Math.random() * (canvas.width - 40) + 20, Math.random() * botH + botStart, 'ion'));
   }
 }
 
-function drawMembrane() {
-  const top = MEMBRANE_Y - MEMBRANE_THICKNESS / 2;
-  
-  ctx.fillStyle = '#fef08a';
-  ctx.fillRect(0, top, canvas.width, MEMBRANE_THICKNESS);
-
-  ctx.strokeStyle = '#eab308';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(0, top); ctx.lineTo(canvas.width, top);
-  ctx.moveTo(0, top + MEMBRANE_THICKNESS); ctx.lineTo(canvas.width, top + MEMBRANE_THICKNESS);
-  ctx.stroke();
-
-  channels.forEach(ch => {
-    ctx.fillStyle = modeSelect.value === 'active' ? '#f59e0b' : '#6366f1';
-    ctx.fillRect(ch.x - ch.width / 2, top - 8, ch.width, MEMBRANE_THICKNESS + 16);
-    ctx.clearRect(ch.x - ch.width / 3.5, top - 8, ch.width / 1.75, MEMBRANE_THICKNESS + 16);
-
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 11px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(ch.name, ch.x, MEMBRANE_Y + 4);
-  });
-
-  ctx.textAlign = 'left';
-  ctx.fillStyle = '#64748b';
-  ctx.font = 'bold 13px sans-serif';
-  ctx.fillText('세포 외액 (Outside)', 14, 24);
-  ctx.fillText('세포막 (Phospholipid Bilayer)', 14, MEMBRANE_Y - 8);
-  ctx.fillText('세포질 (Inside)', 14, canvas.height - 18);
-}
-
-function calculateNetDirection(mode) {
-  let targetType = 'permeable';
-  if (mode === 'facilitated') targetType = 'glucose';
-  else if (mode === 'active') targetType = 'active_ion';
-  else if (mode === 'osmosis') targetType = 'water';
-
+function calculateNetDirection() {
   let outCount = 0, inCount = 0;
   particles.forEach(p => {
-    if (p.type === targetType) {
+    if (p.kind !== 'fructose') {
       if (p.y < MEMBRANE_Y) outCount++;
       else inCount++;
     }
   });
 
-  // 확산/촉진확산: 안팎 개수 차이가 2개 이내면 평형 도달로 판별 (netDirection = 0)
-  if (mode === 'simple' || mode === 'facilitated') {
-    if (Math.abs(outCount - inCount) <= 2) return 0;
-    return outCount > inCount ? 1 : -1; // 1: 아래로 순이동, -1: 위로 순이동
-  }
-  // 능동 수송: 아래에 입자가 남아있으면 위로 배출
-  else if (mode === 'active') {
+  if (modeSelect.value === 'active') {
     return inCount > 2 ? -1 : 0;
   }
-  // 삼투: 물 분자 평형 판별
-  else if (mode === 'osmosis') {
-    return inCount < 32 ? 1 : 0;
-  }
-  return 0;
+  if (Math.abs(outCount - inCount) <= 4) return 0;
+  return outCount > inCount ? 1 : -1;
 }
 
 function updateCounts() {
@@ -319,10 +485,13 @@ function updateCounts() {
 
 function loop() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawMembrane();
+  
+  drawBackgroundAndLabels();
+  drawPhospholipidBilayer();
+  drawProteins();
 
   const mode = modeSelect.value;
-  const netDir = calculateNetDirection(mode);
+  const netDir = calculateNetDirection();
 
   particles.forEach(p => {
     p.update(mode, netDir);
