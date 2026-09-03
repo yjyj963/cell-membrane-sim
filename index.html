@@ -3,63 +3,119 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>세포막 물질 이동 시뮬레이션</title>
+  <title>세포막을 통한 물질 출입 시뮬레이션</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background-color: #f1f5f9; color: #1e293b; display: flex; flex-direction: column; align-items: center; padding: 24px 16px; }
-    h1 { margin-bottom: 8px; font-size: 1.6rem; color: #0f172a; }
-    .subtitle { margin-bottom: 20px; font-size: 0.95rem; color: #64748b; }
-    .container { display: flex; flex-wrap: wrap; gap: 24px; justify-content: center; max-width: 1050px; width: 100%; }
-    canvas { background-color: #ffffff; border: 2px solid #cbd5e1; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); }
-    .control-panel { background: white; padding: 22px; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); width: 340px; display: flex; flex-direction: column; gap: 16px; }
-    .control-group { display: flex; flex-direction: column; gap: 8px; }
-    label { font-weight: 700; font-size: 0.9rem; color: #334155; }
-    select, button { padding: 10px 14px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 0.95rem; cursor: pointer; }
-    select { background-color: #f8fafc; }
-    button { background-color: #2563eb; color: white; border: none; font-weight: 600; transition: background 0.2s; }
-    button:hover { background-color: #1d4ed8; }
-    .legend { background-color: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 0.85rem; line-height: 1.6; }
-    .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-    .legend-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
-    .stats { font-size: 0.85rem; line-height: 1.6; background-color: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; }
-    .desc-box { font-size: 0.85rem; line-height: 1.5; color: #475569; background: #eff6ff; padding: 12px; border-left: 4px solid #3b82f6; border-radius: 4px; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif; }
+    body { background-color: #f1f5f9; color: #1e293b; display: flex; flex-direction: column; align-items: center; padding: 20px 12px; }
+    header { text-align: center; margin-bottom: 16px; }
+    h1 { font-size: 1.6rem; color: #0f172a; margin-bottom: 4px; }
+    .subtitle { font-size: 0.95rem; color: #64748b; }
+
+    .main-wrap { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; max-width: 1220px; width: 100%; }
+    
+    .canvas-card {
+      background: white;
+      padding: 10px;
+      border-radius: 12px;
+      box-shadow: 0 8px 20px -4px rgba(0, 0, 0, 0.08);
+      border: 1px solid #cbd5e1;
+    }
+    canvas { display: block; border-radius: 8px; }
+
+    .control-panel {
+      width: 320px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 8px 20px -4px rgba(0, 0, 0, 0.08);
+      border: 1px solid #cbd5e1;
+    }
+
+    .control-group { display: flex; flex-direction: column; gap: 6px; }
+    label { font-weight: 700; font-size: 0.85rem; color: #334155; }
+    select, button {
+      padding: 9px 12px;
+      border-radius: 7px;
+      border: 1px solid #cbd5e1;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    select { background-color: #f8fafc; outline: none; }
+    button {
+      background-color: #0284c7;
+      color: white;
+      border: none;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+    button:hover { background-color: #0369a1; }
+
+    .card-box {
+      background-color: #f8fafc;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      font-size: 0.85rem;
+      line-height: 1.55;
+    }
+    .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .legend-icon { width: 14px; height: 14px; display: inline-block; }
+    .legend-circle { border-radius: 50%; }
+    .legend-hex { clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); }
+
+    .desc-box {
+      font-size: 0.83rem;
+      line-height: 1.5;
+      color: #334155;
+      background: #eff6ff;
+      padding: 12px;
+      border-left: 4px solid #0284c7;
+      border-radius: 4px;
+    }
   </style>
 </head>
 <body>
-  <h1>세포막 물질 수송 시뮬레이터</h1>
-  <div class="subtitle">선택적 투과성, 기질 특이성, 능동 수송 및 삼투 현상 관찰</div>
+  <header>
+    <h1>세포막 물질 출입 시뮬레이션</h1>
+    <div class="subtitle">인지질 이중층의 선택적 투과성과 수송 단백질의 특이성</div>
+  </header>
 
-  <div class="container">
-    <canvas id="simCanvas" width="620" height="460"></canvas>
-    
+  <div class="main-wrap">
+    <div class="canvas-card">
+      <canvas id="simCanvas" width="850" height="480"></canvas>
+    </div>
+
     <div class="control-panel">
       <div class="control-group">
-        <label for="modeSelect">수송 모드 선택</label>
+        <label for="modeSelect">시뮬레이션 모드</label>
         <select id="modeSelect">
-          <option value="simple">1. 단순 확산 (지용성/기체 vs 극성/대형 분자)</option>
-          <option value="facilitated">2. 촉진 확산 (포도당 vs 특이성 없는 과당)</option>
-          <option value="active">3. 능동 수송 (ATP 펌프 역방향 수송)</option>
-          <option value="osmosis">4. 삼투 현상 (용질 농도차와 빠른 물 이동)</option>
+          <option value="all">통합 관찰 모드 (교과서 종합)</option>
+          <option value="simple">1. 단순 확산 (산소/소수성 분자)</option>
+          <option value="carrier">2. 촉진 확산 - 운반체단백질 (포도당 vs 과당)</option>
+          <option value="channel">3. 촉진 확산 - 통로단백질 (이온 채널)</option>
+          <option value="active">4. 능동 수송 (ATP 펌프 역방향)</option>
         </select>
       </div>
 
       <div class="control-group">
-        <button id="resetBtn">시뮬레이션 재시작</button>
+        <button id="resetBtn">시뮬레이션 리셋</button>
       </div>
 
-      <div class="legend" id="legendBox"></div>
+      <div class="card-box" id="legendBox"></div>
 
-      <div class="stats">
+      <div class="card-box">
         <strong>구역별 입자 수치</strong><br>
-        세포 밖 (상단): <span id="outsideCount" style="font-weight: bold; color: #2563eb;">0</span>개<br>
-        세포 안 (하단): <span id="insideCount" style="font-weight: bold; color: #16a34a;">0</span>개
+        세포 밖 (상단): <span id="outsideCount" style="font-weight: 700; color: #0284c7;">0</span>개<br>
+        세포 안 (하단): <span id="insideCount" style="font-weight: 700; color: #d97706;">0</span>개
       </div>
 
       <div class="desc-box" id="modeDesc"></div>
     </div>
   </div>
 
-  <!-- 캐시 방지를 위해 ?v=2 추가 -->
-  <script src="simulation.js?v=2"></script>
+  <script src="simulation.js?v=5"></script>
 </body>
 </html>
